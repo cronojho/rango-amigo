@@ -31,12 +31,54 @@
                 <input type="text" class="form-control" id="horario_retirada" required>
             </div>
             
+            <hr>
+
+            <button type="button" class="btn btn-outline-primary mb-3" id="btn-local">
+                📍 Usar Minha Localização Atual
+            </button>
+            
+            <input type="hidden" id="latitude">
+            <input type="hidden" id="longitude">
+            
+            <p id="local-status" class="text-muted"></p>
+            
             <button type="submit" class="btn btn-success" id="btn-salvar">Salvar Doação</button>
         </form>
     </div>
 
     <script>
-        // JavaScript REAL para ENVIAR dados para sua API
+        // --- SCRIPT NOVO PARA GEOLOCALIZAÇÃO ---
+        document.getElementById('btn-local').addEventListener('click', () => {
+            if ("geolocation" in navigator) {
+                const status = document.getElementById('local-status');
+                status.innerText = "Obtendo localização...";
+                status.className = "text-info"; // Muda a cor para azul
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        // Sucesso!
+                        const lat = position.coords.latitude;
+                        const long = position.coords.longitude;
+                        
+                        document.getElementById('latitude').value = lat;
+                        document.getElementById('longitude').value = long;
+                        
+                        status.innerText = `Localização obtida com sucesso!`;
+                        status.className = "text-success"; // Muda a cor para verde
+                    },
+                    (error) => {
+                        // Erro!
+                        status.innerText = "Erro ao obter localização. Por favor, libere a permissão no seu navegador e tente novamente.";
+                        status.className = "text-danger"; // Muda a cor para vermelho
+                    }
+                );
+            } else {
+                alert("Geolocalização não é suportada pelo seu navegador.");
+            }
+        });
+
+
+        // --- SCRIPT ATUALIZADO PARA ENVIAR O FORMULÁRIO ---
         document.getElementById('form-doacao').addEventListener('submit', async function(event) {
             event.preventDefault(); // Impede o envio padrão
 
@@ -48,8 +90,19 @@
             const dados = {
                 nome_local: document.getElementById('nome_local').value,
                 itens: document.getElementById('itens').value,
-                horario_retirada: document.getElementById('horario_retirada').value
+                horario_retirada: document.getElementById('horario_retirada').value,
+                // --- CAMPOS NOVOS ---
+                latitude: parseFloat(document.getElementById('latitude').value),
+                longitude: parseFloat(document.getElementById('longitude').value)
             };
+            
+            // Verificação simples se a localização foi obtida
+            if (!dados.latitude || !dados.longitude) {
+                alert("Por favor, clique no botão 'Usar Minha Localização Atual' antes de salvar.");
+                btn.disabled = false;
+                btn.innerText = 'Salvar Doação';
+                return; // Para a execução do salvamento
+            }
 
             try {
                 // 2. Enviar os dados para a API Flask (POST)

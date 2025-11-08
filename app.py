@@ -23,6 +23,9 @@ class Doacao(db.Model):
     nome_local = db.Column(db.String(100), nullable=False)
     itens = db.Column(db.Text, nullable=False)
     horario_retirada = db.Column(db.String(100), nullable=False)
+    # --- CAMPOS NOVOS ---
+    latitude = db.Column(db.Float, nullable=False)
+    longitude = db.Column(db.Float, nullable=False)
 
     def to_dict(self):
         """Converte o objeto Doacao para um dicionário (para enviar como JSON)"""
@@ -30,7 +33,10 @@ class Doacao(db.Model):
             "id": self.id,
             "nome_local": self.nome_local,
             "itens": self.itens,
-            "horario_retirada": self.horario_retirada
+            "horario_retirada": self.horario_retirada,
+            # --- CAMPOS NOVOS ---
+            "latitude": self.latitude,
+            "longitude": self.longitude
         }
 
 # --- Rotas da API (Os "Endereços" do seu Cérebro) ---
@@ -56,11 +62,16 @@ def create_doacao():
     try:
         dados = request.get_json() # Pega os dados que o front-end enviar (em JSON)
 
+        # --- CORREÇÃO ESTÁ AQUI ---
         nova_doacao = Doacao(
             nome_local=dados['nome_local'],
             itens=dados['itens'],
-            horario_retirada=dados['horario_retirada']
+            horario_retirada=dados['horario_retirada'],
+            # Linhas que estavam faltando:
+            latitude=dados['latitude'],
+            longitude=dados['longitude']
         )
+        # --- FIM DA CORREÇÃO ---
         
         db.session.add(nova_doacao)
         db.session.commit()

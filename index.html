@@ -4,51 +4,123 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rango Amigo</title>
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <nav class="navbar bg-white shadow-sm">
+    <style>
+        body {
+            /* Deixa espaço para o menu fixo no topo */
+            padding-top: 56px;
+            overflow: hidden; /* Impede o scroll da página inteira */
+        }
+        
+        /* Define a altura das colunas do mapa e da lista */
+        .coluna-conteudo {
+            /* 100% da altura da tela MENOS a altura do menu */
+            height: calc(100vh - 56px);
+        }
+        
+        #map {
+            /* O mapa ocupa 100% da altura da sua coluna */
+            height: 100%;
+        }
+        
+        #lista-doacoes-wrapper {
+            /* A lista ocupa 100% da altura e permite ROLAGEM interna */
+            height: 100%;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <nav class="navbar bg-white shadow-sm fixed-top">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">Rango Amigo</span>
             <a href="postar.html" class="btn btn-success">Cadastrar Nova Doação</a>
         </div>
     </nav>
 
-    <div class="container mt-4">
-        <h2 class="mb-3">Doações Disponíveis</h2>
-        <div id="lista-doacoes">
+    <div class="container-fluid">
+        <div class="row">
+            
+            <div class="col-md-6 p-0 coluna-conteudo">
+                <div id="map"></div>
             </div>
+            
+            <div class="col-md-6 coluna-conteudo">
+                <div id="lista-doacoes-wrapper" class="p-3">
+                    <h2 class="h4 mb-3">Doações Disponíveis</h2>
+                    <div id="lista-doacoes">
+                        <p>Carregando doações...</p>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
     </div>
 
     <script>
-        // JavaScript REAL para buscar dados da sua API
-        window.addEventListener('load', carregarDoacoes);
+        // --- 1. INICIALIZAÇÃO DO MAPA ---
+        const coordenadasPederneiras = [-22.35, -48.77]; 
+        const map = L.map('map').setView(coordenadasPederneiras, 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
 
+        
+        // --- 2. LOCALIZAÇÃO DO USUÁRIO ---
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const lat = pos.coords.latitude;
+                const long = pos.coords.longitude;
+                L.marker([lat, long]).addTo(map)
+                    .bindPopup('<b>Você está aqui!</b>')
+                    .openPopup();
+                //map.setView([lat, long], 15); // Opcional: foca no usuário
+            }, 
+            () => { console.log("Não foi possível pegar a localização do usuário."); }
+        );
+
+        
+        // --- 3. CARREGAMENTO DAS DOAÇÕES (A GRANDE MUDANÇA) ---
         async function carregarDoacoes() {
+            // Pega o container da lista de cards
             const feed = document.getElementById('lista-doacoes');
-            feed.innerHTML = '<p>Carregando doações...</p>';
+            feed.innerHTML = '<p>Carregando...</p>';
 
             try {
-                // 1. Chamar sua API Flask
+                // 1. Chamar sua API Flask (igual antes)
                 const response = await fetch('http://127.0.0.1:5000/api/doacoes');
-                
-                if (!response.ok) {
-                    throw new Error('Falha ao carregar dados da API');
-                }
+                if (!response.ok) throw new Error('Falha ao carregar dados da API');
                 
                 const doacoes = await response.json();
-
-                // 2. Limpar o feed
-                feed.innerHTML = '';
+                feed.innerHTML = ''; // Limpa o "Carregando..."
 
                 if (doacoes.length === 0) {
                     feed.innerHTML = '<p class="text-muted">Nenhuma doação cadastrada no momento.</p>';
                     return;
                 }
 
-                // 3. Criar os cards para cada doação
+                // 2. Loop para criar OS DOIS ao mesmo tempo: Pins e Cards
                 doacoes.forEach(doacao => {
+                    
+                    // --- A. Cria o conteúdo do Popup (para o pin) ---
+                    const popupContent = `
+                        <b>${doacao.nome_local}</b><br>
+                        <strong>Itens:</strong> ${doacao.itens}<br>
+                        <strong>Retirada:</strong> ${doacao.horario_retirada}
+                    `;
+                    
+                    // --- B. Adiciona o Pin no Mapa ---
+                    L.marker([doacao.latitude, doacao.longitude])
+                        .addTo(map)
+                        .bindPopup(popupContent);
+                    
+                    // --- C. Cria o Card na Lista ---
                     const card = document.createElement('div');
                     card.className = 'card mb-3';
                     card.innerHTML = `
@@ -58,8 +130,12 @@
                                 <strong>Itens:</strong> ${doacao.itens} <br>
                                 <strong>Retirada:</strong> ${doacao.horario_retirada}
                             </p>
+                            <small class="text-muted">
+                                Coordenadas: ${doacao.latitude.toFixed(4)}, ${doacao.longitude.toFixed(4)}
+                            </small>
                         </div>
                     `;
+                    // Adiciona o card criado à lista na tela
                     feed.appendChild(card);
                 });
 
@@ -67,6 +143,10 @@
                 feed.innerHTML = `<p class="text-danger">Erro ao carregar doações: ${error.message}</p>`;
             }
         }
+        
+        // --- 4. EXECUÇÃO ---
+        window.addEventListener('load', carregarDoacoes);
+
     </script>
 </body>
 </html>
