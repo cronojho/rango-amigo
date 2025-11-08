@@ -10,8 +10,14 @@
 
     <nav class="navbar bg-white shadow-sm">
         <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">Rango Amigo</span>
-            <a href="/" class="btn btn-outline-secondary">Voltar ao Feed</a>
+            <a class="navbar-brand" href="{{ url_for('map') }}">Rango Amigo</a>
+            
+            <div>
+                <span class="navbar-text me-3">
+                    Olá, {{ current_user.nome_completo.split(' ')[0] }}
+                </span>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger ms-2">Sair</a>
+            </div>
         </div>
     </nav>
 
@@ -30,38 +36,29 @@
                 <label for="horario_retirada" class="form-label">Horário de Retirada</label>
                 <input type="text" class="form-control" id="horario_retirada" required>
             </div>
-            
             <hr>
-
             <button type="button" class="btn btn-outline-primary mb-3" id="btn-local">
                 📍 Usar Minha Localização Atual
             </button>
-            
             <input type="hidden" id="latitude">
             <input type="hidden" id="longitude">
-            
             <p id="local-status" class="text-muted"></p>
-            
             <button type="submit" class="btn btn-success" id="btn-salvar">Salvar Doação</button>
         </form>
     </div>
 
     <script>
-        // --- SCRIPT PARA GEOLOCALIZAÇÃO ---
         document.getElementById('btn-local').addEventListener('click', () => {
             if ("geolocation" in navigator) {
                 const status = document.getElementById('local-status');
                 status.innerText = "Obtendo localização...";
                 status.className = "text-info";
-
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const lat = position.coords.latitude;
                         const long = position.coords.longitude;
-                        
                         document.getElementById('latitude').value = lat;
                         document.getElementById('longitude').value = long;
-                        
                         status.innerText = `Localização obtida com sucesso!`;
                         status.className = "text-success";
                     },
@@ -75,16 +72,12 @@
             }
         });
 
-
-        // --- SCRIPT PARA ENVIAR O FORMULÁRIO ---
         document.getElementById('form-doacao').addEventListener('submit', async function(event) {
             event.preventDefault(); 
-
             const btn = document.getElementById('btn-salvar');
             btn.disabled = true;
             btn.innerText = 'Salvando...';
 
-            // 1. Coletar os dados do formulário
             const dados = {
                 nome_local: document.getElementById('nome_local').value,
                 itens: document.getElementById('itens').value,
@@ -101,23 +94,16 @@
             }
 
             try {
-                // --- URL DO FETCH CORRIGIDA ---
-                // Agora é um link relativo, funciona local e no Render
                 const response = await fetch('/api/doacao', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dados)
                 });
-
                 if (!response.ok) {
                     throw new Error('Falha ao salvar. Verifique os dados.');
                 }
-
                 alert('Doação cadastrada com sucesso!');
-                window.location.href = '/'; // Volta para o feed (rota principal)
-
+                window.location.href = '/map'; // Volta para o mapa
             } catch (error) {
                 alert(`Erro: ${error.message}`);
                 btn.disabled = false;
