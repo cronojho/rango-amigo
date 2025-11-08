@@ -53,20 +53,17 @@
                 </div>
                 <div class="col-md-6">
                     <label for="rua" class="form-label">Rua / Logradouro</label>
-                    <input type="text" class="form-control" id="rua" readonly>
-                </div>
+                    <input type="text" class="form-control" id="rua"> </div>
                 <div class="col-md-4">
                     <label for="numero" class="form-label">Número</label>
                     <input type="text" class="form-control" id="numero">
                 </div>
                 <div class="col-md-4">
                     <label for="bairro" class="form-label">Bairro</label>
-                    <input type="text" class="form-control" id="bairro" readonly>
-                </div>
+                    <input type="text" class="form-control" id="bairro"> </div>
                 <div class="col-md-4">
                     <label for="cidade" class="form-label">Cidade</label>
-                    <input type="text" class="form-control" id="cidade" readonly>
-                </div>
+                    <input type="text" class="form-control" id="cidade"> </div>
             </div>
             <input type="hidden" id="latitude">
             <input type="hidden" id="longitude">
@@ -78,12 +75,7 @@
 
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
       <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header">
-          <strong class="me-auto" id="toast-title">Rango Amigo</strong>
-          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
-        <div class="toast-body" id="toast-body"></div>
-      </div>
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -111,7 +103,7 @@
         const bairroEl = document.getElementById('bairro');
         const cidadeEl = document.getElementById('cidade');
         
-        // --- Lógica do GPS (ATUALIZADA) ---
+        // --- Lógica do GPS (sem alteração) ---
         document.getElementById('btn-local').addEventListener('click', () => {
             if ("geolocation" in navigator) {
                 statusEl.innerText = "Obtendo localização...";
@@ -127,7 +119,6 @@
                     (error) => {
                         statusEl.innerText = "Erro ao obter localização. Tente novamente.";
                         statusEl.className = "text-danger mt-3";
-                        // Limpa lat/lon se o GPS falhar
                         latEl.value = '';
                         lonEl.value = '';
                     }
@@ -137,7 +128,7 @@
             }
         });
 
-        // --- LÓGICA DO CEP (ATUALIZADA) ---
+        // --- LÓGICA DO CEP (ATUALIZADA com Fallback) ---
         document.getElementById('btn-buscar-cep').addEventListener('click', async () => {
             const cep = cepEl.value.replace(/\D/g, ''); 
             if (cep.length !== 8) {
@@ -147,11 +138,11 @@
             }
             statusEl.innerText = "Buscando CEP...";
             statusEl.className = "text-info mt-3";
-            // Limpa lat/lon antigos antes de buscar
             latEl.value = '';
             lonEl.value = '';
             
             try {
+                // 1. Tenta a BrasilAPI
                 const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
                 if (!response.ok) throw new Error('CEP não encontrado.');
                 const data = await response.json();
@@ -160,25 +151,29 @@
                 bairroEl.value = data.neighborhood;
                 cidadeEl.value = data.city;
                 
+                // 2. Tenta pegar as coordenadas da BrasilAPI
                 if (data.location && data.location.coordinates) {
                     const coords = data.location.coordinates;
-                    // Garante que estamos pegando o formato correto (lat/lng ou latitude/longitude)
                     const latitude = coords.latitude || coords.lat;
                     const longitude = coords.longitude || coords.lng;
                     
-                    if (!latitude || !longitude) {
-                         throw new Error('CEP encontrado, mas sem coordenadas de mapa.');
+                    if (latitude && longitude) {
+                        // SUCESSO TOTAL (BrasilAPI tinha tudo)
+                        latEl.value = latitude;
+                        lonEl.value = longitude;
+                        statusEl.innerText = "Endereço e mapa encontrados! (via CEP)";
+                        statusEl.className = "text-success mt-3";
+                        return; // Termina a função aqui
                     }
-                    
-                    // Preenche os campos ocultos
-                    latEl.value = latitude;
-                    lonEl.value = longitude;
-                    
-                    statusEl.innerText = "Endereço encontrado com sucesso! (via CEP)";
-                    statusEl.className = "text-success mt-3";
-                } else {
-                    throw new Error('CEP encontrado, mas sem coordenadas de mapa.');
                 }
+                
+                // 3. FALLBACK: Se chegamos aqui, a BrasilAPI não tinha as coordenadas
+                statusEl.innerText = "Endereço encontrado. Buscando localização no mapa...";
+                statusEl.className = "text-warning mt-3"; // Amarelo (Aviso)
+                
+                // Chama a nova função de geocodificação
+                await geocodeAddress(data.street, data.city, data.state);
+
             } catch (error) {
                 statusEl.innerText = error.message;
                 statusEl.className = "text-danger mt-3";
@@ -186,39 +181,54 @@
             }
         });
         
+        // --- NOVA FUNÇÃO: Geocode (Endereço -> Coordenadas) ---
+        async function geocodeAddress(rua, cidade, estado) {
+            try {
+                const query = encodeURIComponent(`${rua}, ${cidade}, ${estado}, Brasil`);
+                const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`;
+                
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Erro no serviço de mapa.');
+                
+                const geoData = await response.json();
+                
+                if (geoData && geoData.length > 0) {
+                    // SUCESSO DO FALLBACK
+                    latEl.value = geoData[0].lat;
+                    lonEl.value = geoData[0].lon;
+                    statusEl.innerText = "Localização do mapa encontrada com sucesso!";
+                    statusEl.className = "text-success mt-3";
+                } else {
+                    throw new Error('Não foi possível encontrar este endereço no mapa.');
+                }
+            } catch (error) {
+                statusEl.innerText = error.message + " Por favor, use o GPS ou verifique o endereço.";
+                statusEl.className = "text-danger mt-3";
+                latEl.value = '';
+                lonEl.value = '';
+            }
+        }
+        
         function limparCamposCep(manterCep) {
             if (!manterCep) cepEl.value = '';
             ruaEl.value = '';
             bairroEl.value = '';
             cidadeEl.value = '';
-            // Não limpamos lat/lon aqui, pois eles podem ter vindo do GPS
         }
 
-        // --- LÓGICA DE ENVIO (ATUALIZADA com Debug) ---
+        // --- LÓGICA DE ENVIO (sem alteração) ---
         document.getElementById('form-doacao').addEventListener('submit', async function(event) {
             event.preventDefault(); 
             const btn = document.getElementById('btn-salvar');
-            
             btn.disabled = true;
-            btn.innerHTML = `
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                Salvando...
-            `;
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Salvando...`;
 
-            // Pega os valores dos campos ocultos
-            const latitudeValue = latEl.value;
-            const longitudeValue = lonEl.value;
-            
-            // === DEBUG: Vamos ver o que está nos campos ===
-            console.log("Latitude no campo oculto:", latitudeValue);
-            console.log("Longitude no campo oculto:", longitudeValue);
-            
             const dados = {
                 nome_local: document.getElementById('nome_local').value,
                 itens: document.getElementById('itens').value,
                 horario_retirada: document.getElementById('horario_retirada').value,
-                latitude: parseFloat(latitudeValue),
-                longitude: parseFloat(longitudeValue),
+                latitude: parseFloat(latEl.value),
+                longitude: parseFloat(lonEl.value),
                 cep: cepEl.value,
                 rua: ruaEl.value,
                 numero: document.getElementById('numero').value,
@@ -226,14 +236,8 @@
                 cidade: cidadeEl.value
             };
             
-            // === DEBUG: Vamos ver o que o parseFloat gerou ===
-            console.log("Latitude convertida (dados.latitude):", dados.latitude);
-            console.log("Longitude convertida (dados.longitude):", dados.longitude);
-            
-            // A validação
             if (!dados.latitude || !dados.longitude) {
-                console.error("Validação falhou! Um dos valores é 'falsy' (NaN, 0, undefined, null).");
-                showToast("Por favor, use o botão 'Usar Minha Localização Atual' ou 'Buscar CEP' antes de salvar.", "Atenção", "info");
+                showToast("Falha ao obter coordenadas. Use o GPS ou um CEP válido.", "Atenção", "danger");
                 btn.disabled = false;
                 btn.innerText = 'Salvar Doação'; 
                 return;
