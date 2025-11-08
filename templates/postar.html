@@ -11,7 +11,6 @@
     <nav class="navbar bg-white shadow-sm">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('map') }}">Rango Amigo</a>
-            
             <div>
                 <span class="navbar-text me-3">
                     Olá, {{ current_user.nome_completo.split(' ')[0] }}
@@ -37,12 +36,17 @@
                 <input type="text" class="form-control" id="horario_retirada" required>
             </div>
             <hr>
-            <button type="button" class="btn btn-outline-primary mb-3" id="btn-local">
+            
+            <button type="button" class="btn btn-outline-primary mb-3" id="btn-local" 
+                    aria-label="Ativar geolocalização para usar sua localização atual">
                 📍 Usar Minha Localização Atual
             </button>
+            
             <input type="hidden" id="latitude">
             <input type="hidden" id="longitude">
-            <p id="local-status" class="text-muted"></p>
+            
+            <p id="local-status" class="text-muted" role="status" aria-live="polite"></p>
+            
             <button type="submit" class="btn btn-success" id="btn-salvar">Salvar Doação</button>
         </form>
     </div>

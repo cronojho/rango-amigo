@@ -22,7 +22,10 @@
             #lista-doacoes-wrapper { height: auto; overflow-y: visible; }
         }
         .doacao-card { cursor: pointer; transition: background-color 0.2s; }
-        .doacao-card:hover { background-color: #f8f9fa; }
+        .doacao-card:hover, .doacao-card:focus { 
+            background-color: #f8f9fa; 
+            outline: 2px solid #0d6efd; /* Destaque para navegação via teclado */
+        }
     </style>
 </head>
 <body>
@@ -30,7 +33,6 @@
     <nav class="navbar bg-white shadow-sm fixed-top">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('map') }}">Rango Amigo</a>
-            
             <div>
                 <span class="navbar-text me-3">
                     Olá, {{ current_user.nome_completo.split(' ')[0] }}
@@ -50,7 +52,7 @@
             
             <div class="col-md-5 coluna-conteudo">
                 <div id="lista-doacoes-wrapper" class="p-3">
-                    <h2 class="h4 mb-3">Doações Disponíveis</h2>
+                    <h2 class="h4 mb-3" aria-label="Lista de Doações Disponíveis">Doações Disponíveis</h2>
                     <div id="lista-doacoes">
                         <p>Carregando doações...</p>
                     </div>
@@ -61,8 +63,9 @@
     </div>
 
     <script>
+        // --- (Inicialização do Mapa e Localização do Usuário - sem alteração) ---
         const coordenadasPederneiras = [-22.35, -48.77]; 
-        const map = L.map('map').setView(coordenadasPederneiras, 14);
+        const map = L.map('map').setView(coordenadeiras, 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
@@ -76,6 +79,8 @@
             () => { console.log("Não foi possível pegar a localização do usuário."); }
         );
 
+        
+        // --- (Carregamento das Doações - com 3 mudanças) ---
         const marcadores = {};
         
         async function carregarDoacoes() {
@@ -111,6 +116,12 @@
                     card.className = 'card mb-3 doacao-card';
                     card.dataset.doacaoId = doacao.id; 
                     
+                    // === MUDANÇA DE ACESSIBILIDADE 1 e 2 ===
+                    // Diz ao leitor de tela que este <div> é um 'botão'
+                    card.setAttribute('role', 'button');
+                    // Adiciona o <div> à navegação por 'Tab' do teclado
+                    card.setAttribute('tabindex', '0');  
+                    
                     card.innerHTML = `
                         <div class="card-body">
                             <h5 class="card-title">${doacao.nome_local}</h5>
@@ -128,6 +139,7 @@
             }
         }
         
+        // --- (Listener de Clique - sem alteração) ---
         document.getElementById('lista-doacoes').addEventListener('click', (e) => {
             const card = e.target.closest('.doacao-card');
             if (card) {
@@ -140,6 +152,19 @@
             }
         });
 
+        // === MUDANÇA DE ACESSIBILIDADE 3 ===
+        // Adiciona um listener para a tecla 'Enter' ou 'Espaço' na lista
+        document.getElementById('lista-doacoes').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { // Se for Enter ou Espaço
+                const card = e.target.closest('.doacao-card');
+                if (card) {
+                    e.preventDefault(); // Evita que a página role (com a tecla Espaço)
+                    card.click(); // Simula o clique que já programamos
+                }
+            }
+        });
+
+        // --- (Execução - sem alteração) ---
         window.addEventListener('load', carregarDoacoes);
     </script>
 </body>
