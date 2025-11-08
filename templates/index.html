@@ -12,26 +12,52 @@
 
     <style>
         body {
-            /* Deixa espaço para o menu fixo no topo */
-            padding-top: 56px;
-            overflow: hidden; /* Impede o scroll da página inteira */
+            padding-top: 56px; /* Altura do menu */
         }
         
-        /* Define a altura das colunas do mapa e da lista */
-        .coluna-conteudo {
-            /* 100% da altura da tela MENOS a altura do menu */
-            height: calc(100vh - 56px);
-        }
-        
+        /* --- ESTILO PARA CELULAR (PADRÃO) --- */
         #map {
-            /* O mapa ocupa 100% da altura da sua coluna */
-            height: 100%;
+            /* No celular, o mapa tem uma altura fixa */
+            height: 50vh; /* 50% da altura da tela */
+            width: 100%;
         }
         
         #lista-doacoes-wrapper {
-            /* A lista ocupa 100% da altura e permite ROLAGEM interna */
-            height: 100%;
-            overflow-y: auto;
+            /* No celular, a lista tem altura automática e permite scroll da página */
+            height: auto;
+            overflow-y: visible;
+        }
+
+        /* --- ESTILO PARA COMPUTADOR (Telas 'md' de 768px ou mais) --- */
+        @media (min-width: 768px) {
+            body {
+                overflow: hidden; /* Trava o scroll da página inteira */
+            }
+            
+            .coluna-conteudo {
+                /* No PC, as colunas têm a altura da tela menos o menu */
+                height: calc(100vh - 56px);
+            }
+            
+            #map {
+                /* O mapa ocupa 100% da altura da sua coluna */
+                height: 100%;
+            }
+            
+            #lista-doacoes-wrapper {
+                /* A lista ocupa 100% da altura e permite ROLAGEM interna */
+                height: 100%;
+                overflow-y: auto;
+            }
+        }
+        
+        /* Classe para destacar o card ao clicar */
+        .doacao-card {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .doacao-card:hover {
+            background-color: #f8f9fa; /* Um cinza bem claro */
         }
     </style>
 </head>
@@ -47,11 +73,11 @@
     <div class="container-fluid">
         <div class="row">
             
-            <div class="col-md-6 p-0 coluna-conteudo">
+            <div class="col-md-7 p-0 coluna-conteudo">
                 <div id="map"></div>
             </div>
             
-            <div class="col-md-6 coluna-conteudo">
+            <div class="col-md-5 coluna-conteudo">
                 <div id="lista-doacoes-wrapper" class="p-3">
                     <h2 class="h4 mb-3">Doações Disponíveis</h2>
                     <div id="lista-doacoes">
@@ -80,48 +106,53 @@
                 L.marker([lat, long]).addTo(map)
                     .bindPopup('<b>Você está aqui!</b>')
                     .openPopup();
-                //map.setView([lat, long], 15); // Opcional: foca no usuário
             }, 
             () => { console.log("Não foi possível pegar a localização do usuário."); }
         );
 
         
-        // --- 3. CARREGAMENTO DAS DOAÇÕES ---
+        // --- 3. CARREGAMENTO DAS DOAÇÕES (COM INTERATIVIDADE) ---
+        
+        // Objeto para guardar os marcadores (pins) e conectar com a lista
+        const marcadores = {};
+        
         async function carregarDoacoes() {
             const feed = document.getElementById('lista-doacoes');
             feed.innerHTML = '<p>Carregando...</p>';
 
             try {
-                // --- URL DO FETCH CORRIGIDA ---
-                // Agora é um link relativo, funciona local e no Render
                 const response = await fetch('/api/doacoes');
                 if (!response.ok) throw new Error('Falha ao carregar dados da API');
                 
                 const doacoes = await response.json();
-                feed.innerHTML = ''; // Limpa o "Carregando..."
+                feed.innerHTML = ''; 
 
                 if (doacoes.length === 0) {
                     feed.innerHTML = '<p class="text-muted">Nenhuma doação cadastrada no momento.</p>';
                     return;
                 }
 
-                // Loop para criar Pins e Cards
                 doacoes.forEach(doacao => {
-                    
+                    // --- A. Cria o conteúdo do Popup (para o pin) ---
                     const popupContent = `
                         <b>${doacao.nome_local}</b><br>
                         <strong>Itens:</strong> ${doacao.itens}<br>
                         <strong>Retirada:</strong> ${doacao.horario_retirada}
                     `;
                     
-                    // Adiciona o Pin no Mapa
-                    L.marker([doacao.latitude, doacao.longitude])
+                    // --- B. Adiciona o Pin no Mapa e GUARDA a referência ---
+                    const marcador = L.marker([doacao.latitude, doacao.longitude])
                         .addTo(map)
                         .bindPopup(popupContent);
                     
-                    // Cria o Card na Lista
+                    // Salva o marcador no objeto usando o ID da doação como chave
+                    marcadores[doacao.id] = marcador;
+                    
+                    // --- C. Cria o Card na Lista ---
                     const card = document.createElement('div');
-                    card.className = 'card mb-3';
+                    card.className = 'card mb-3 doacao-card'; // Adiciona a classe 'doacao-card' para o clique
+                    card.dataset.doacaoId = doacao.id; // Guarda o ID no próprio card
+                    
                     card.innerHTML = `
                         <div class="card-body">
                             <h5 class="card-title">${doacao.nome_local}</h5>
@@ -129,9 +160,6 @@
                                 <strong>Itens:</strong> ${doacao.itens} <br>
                                 <strong>Retirada:</strong> ${doacao.horario_retirada}
                             </p>
-                            <small class="text-muted">
-                                Coordenadas: ${doacao.latitude.toFixed(4)}, ${doacao.longitude.toFixed(4)}
-                            </small>
                         </div>
                     `;
                     feed.appendChild(card);
@@ -142,7 +170,29 @@
             }
         }
         
-        // --- 4. EXECUÇÃO ---
+        // --- 4. NOVO: LISTENER DE CLIQUE NA LISTA ---
+        document.getElementById('lista-doacoes').addEventListener('click', (e) => {
+            // Acha o card clicado (mesmo se o clique for num texto dentro dele)
+            const card = e.target.closest('.doacao-card');
+            
+            if (card) {
+                // Pega o ID que guardamos no card
+                const id = card.dataset.doacaoId;
+                
+                // Acha o marcador (pin) correspondente
+                const marcador = marcadores[id];
+                
+                if (marcador) {
+                    // Usa flyTo() para uma animação suave até o pin
+                    map.flyTo(marcador.getLatLng(), 16); // 16 = nível de zoom
+                    
+                    // Abre o popup do pin
+                    marcador.openPopup();
+                }
+            }
+        });
+
+        // --- 5. EXECUÇÃO ---
         window.addEventListener('load', carregarDoacoes);
 
     </script>
