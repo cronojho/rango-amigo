@@ -35,40 +35,77 @@
                 <label for="horario_retirada" class="form-label">Horário de Retirada</label>
                 <input type="text" class="form-control" id="horario_retirada" required>
             </div>
+            
             <hr>
             
+            <h4 class="h5">Endereço da Doação</h4>
             <button type="button" class="btn btn-outline-primary mb-3" id="btn-local" 
                     aria-label="Ativar geolocalização para usar sua localização atual">
-                📍 Usar Minha Localização Atual
+                📍 Usar Minha Localização Atual (Se você estiver no local)
             </button>
+            <p class="text-center">-- OU --</p>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="cep" class="form-label">CEP</label>
+                    <input type="text" class="form-control" id="cep" placeholder="00000-000">
+                </div>
+                <div class="col-md-2 align-self-end">
+                    <button type="button" class="btn btn-secondary w-100" id="btn-buscar-cep">Buscar</button>
+                </div>
+                <div class="col-md-6">
+                    <label for="rua" class="form-label">Rua / Logradouro</label>
+                    <input type="text" class="form-control" id="rua" readonly>
+                </div>
+                <div class="col-md-4">
+                    <label for="numero" class="form-label">Número</label>
+                    <input type="text" class="form-control" id="numero">
+                </div>
+                <div class="col-md-4">
+                    <label for="bairro" class="form-label">Bairro</label>
+                    <input type="text" class="form-control" id="bairro" readonly>
+                </div>
+                <div class="col-md-4">
+                    <label for="cidade" class="form-label">Cidade</label>
+                    <input type="text" class="form-control" id="cidade" readonly>
+                </div>
+            </div>
             
             <input type="hidden" id="latitude">
             <input type="hidden" id="longitude">
+            <p id="local-status" class="text-muted mt-3" role="status" aria-live="polite"></p>
             
-            <p id="local-status" class="text-muted" role="status" aria-live="polite"></p>
+            <hr>
             
             <button type="submit" class="btn btn-success" id="btn-salvar">Salvar Doação</button>
         </form>
     </div>
 
     <script>
+        const statusEl = document.getElementById('local-status');
+        const latEl = document.getElementById('latitude');
+        const lonEl = document.getElementById('longitude');
+        const cepEl = document.getElementById('cep');
+        const ruaEl = document.getElementById('rua');
+        const bairroEl = document.getElementById('bairro');
+        const cidadeEl = document.getElementById('cidade');
+        
+        // Lógica do Botão GPS
         document.getElementById('btn-local').addEventListener('click', () => {
             if ("geolocation" in navigator) {
-                const status = document.getElementById('local-status');
-                status.innerText = "Obtendo localização...";
-                status.className = "text-info";
+                statusEl.innerText = "Obtendo localização...";
+                statusEl.className = "text-info mt-3";
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        const lat = position.coords.latitude;
-                        const long = position.coords.longitude;
-                        document.getElementById('latitude').value = lat;
-                        document.getElementById('longitude').value = long;
-                        status.innerText = `Localização obtida com sucesso!`;
-                        status.className = "text-success";
+                        latEl.value = position.coords.latitude;
+                        lonEl.value = position.coords.longitude;
+                        statusEl.innerText = `Localização obtida com sucesso! (via GPS)`;
+                        statusEl.className = "text-success mt-3";
+                        limparCamposCep(false); 
                     },
                     (error) => {
-                        status.innerText = "Erro ao obter localização. Por favor, libere a permissão no seu navegador e tente novamente.";
-                        status.className = "text-danger";
+                        statusEl.innerText = "Erro ao obter localização. Tente novamente.";
+                        statusEl.className = "text-danger mt-3";
                     }
                 );
             } else {
@@ -76,6 +113,48 @@
             }
         });
 
+        // Lógica do Botão CEP
+        document.getElementById('btn-buscar-cep').addEventListener('click', async () => {
+            const cep = cepEl.value.replace(/\D/g, ''); 
+            if (cep.length !== 8) {
+                statusEl.innerText = "CEP inválido. Deve conter 8 números.";
+                statusEl.className = "text-danger mt-3";
+                return;
+            }
+            statusEl.innerText = "Buscando CEP...";
+            statusEl.className = "text-info mt-3";
+            try {
+                const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
+                if (!response.ok) throw new Error('CEP não encontrado.');
+                const data = await response.json();
+
+                ruaEl.value = data.street;
+                bairroEl.value = data.neighborhood;
+                cidadeEl.value = data.city;
+                
+                if (data.location && data.location.coordinates) {
+                    latEl.value = data.location.coordinates.latitude;
+                    lonEl.value = data.location.coordinates.longitude;
+                    statusEl.innerText = "Endereço encontrado com sucesso! (via CEP)";
+                    statusEl.className = "text-success mt-3";
+                } else {
+                    throw new Error('CEP encontrado, mas sem coordenadas de mapa.');
+                }
+            } catch (error) {
+                statusEl.innerText = error.message;
+                statusEl.className = "text-danger mt-3";
+                limparCamposCep(true);
+            }
+        });
+        
+        function limparCamposCep(manterCep) {
+            if (!manterCep) cepEl.value = '';
+            ruaEl.value = '';
+            bairroEl.value = '';
+            cidadeEl.value = '';
+        }
+
+        // Lógica de Envio do Formulário
         document.getElementById('form-doacao').addEventListener('submit', async function(event) {
             event.preventDefault(); 
             const btn = document.getElementById('btn-salvar');
@@ -86,26 +165,37 @@
                 nome_local: document.getElementById('nome_local').value,
                 itens: document.getElementById('itens').value,
                 horario_retirada: document.getElementById('horario_retirada').value,
-                latitude: parseFloat(document.getElementById('latitude').value),
-                longitude: parseFloat(document.getElementById('longitude').value)
+                latitude: parseFloat(latEl.value),
+                longitude: parseFloat(lonEl.value),
+                cep: cepEl.value,
+                rua: ruaEl.value,
+                numero: document.getElementById('numero').value,
+                bairro: bairroEl.value,
+                cidade: cidadeEl.value
             };
             
             if (!dados.latitude || !dados.longitude) {
-                alert("Por favor, clique no botão 'Usar Minha Localização Atual' antes de salvar.");
+                alert("Por favor, use o botão 'Usar Minha Localização Atual' ou 'Buscar CEP' antes de salvar.");
                 btn.disabled = false;
                 btn.innerText = 'Salvar Doação';
                 return;
             }
 
             try {
-                const response = await fetch('/api/doacao', {
+                // API agora usa o link relativo
+                const response = await fetch('/api/doacao', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dados)
                 });
-                if (!response.ok) {
-                    throw new Error('Falha ao salvar. Verifique os dados.');
+                // --- Verificação de Erro (Login Expirado) ---
+                if (response.status === 401) {
+                    alert("Sua sessão expirou. Por favor, faça o login novamente.");
+                    window.location.href = '/';
+                    return;
                 }
+                if (!response.ok) throw new Error('Falha ao salvar. Verifique os dados.');
+                
                 alert('Doação cadastrada com sucesso!');
                 window.location.href = '/map'; // Volta para o mapa
             } catch (error) {
