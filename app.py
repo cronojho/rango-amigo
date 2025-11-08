@@ -45,8 +45,8 @@ class Doacao(db.Model):
 def home():
     """Esta rota agora serve a sua página principal (o mapa)"""
     # A primeira vez que rodar no Render, ele cria as tabelas
-    with app.app_context():
-        db.create_all()
+   # with app.app_context():
+    #    db.create_all()
     return render_template('index.html')
 
 @app.route('/postar')
