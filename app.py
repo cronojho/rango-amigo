@@ -28,7 +28,7 @@ login_manager = LoginManager(app)
 login_manager.login_view = 'login' 
 login_manager.login_message_category = 'info' 
 
-# --- Modelos de Banco de Dados ---
+# --- Modelos de Banco de Dados (sem alteração) ---
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -43,7 +43,7 @@ class User(db.Model, UserMixin):
     doacoes = db.relationship('Doacao', backref='author', lazy=True)
 
 class Doacao(db.Model):
-    """Modelo de Doação (com campo 'is_archived')"""
+    # (Modelo Doacao sem alteração)
     id = db.Column(db.Integer, primary_key=True)
     nome_local = db.Column(db.String(100), nullable=False)
     itens = db.Column(db.Text, nullable=False)
@@ -56,12 +56,10 @@ class Doacao(db.Model):
     bairro = db.Column(db.String(100), nullable=True)
     cidade = db.Column(db.String(100), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    
-    # === CAMPO NOVO ===
     is_archived = db.Column(db.Boolean, nullable=False, default=False)
 
     def to_dict(self):
-        """Converte o objeto para JSON, incluindo o status de arquivado"""
+        # (Função to_dict sem alteração)
         return {
             "id": self.id,
             "nome_local": self.nome_local,
@@ -76,11 +74,10 @@ class Doacao(db.Model):
             "numero": self.numero,
             "bairro": self.bairro,
             "cidade": self.cidade,
-            "is_archived": self.is_archived # <-- NOVO
+            "is_archived": self.is_archived
         }
 
-# --- ROTAS DAS PÁGINAS HTML ---
-
+# --- ROTAS DAS PÁGINAS HTML (sem alteração) ---
 @app.route('/map')
 @login_required 
 def map():
@@ -91,22 +88,18 @@ def map():
 def postar_page():
     return render_template('postar.html')
 
-# === ROTA NOVA ===
 @app.route('/minhas-doacoes')
 @login_required
 def minhas_doacoes_page():
-    """Página para o usuário gerenciar suas doações (ativas e arquivadas)"""
     return render_template('minhas-doacoes.html')
 
 # --- ROTAS DE AUTENTICAÇÃO (sem alteração) ---
-
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     # (código sem alteração)
     if current_user.is_authenticated:
         return redirect(url_for('map')) 
     if request.method == 'POST':
-        # ... (lógica de registro) ...
         nome_completo = request.form.get('nome_completo')
         email = request.form.get('email')
         password = request.form.get('password')
@@ -160,10 +153,8 @@ def logout():
 @app.route('/api/doacoes', methods=['GET'])
 @login_required 
 def get_doacoes():
-    """API que lista apenas doações ATIVAS (para o mapa)"""
+    # (código sem alteração)
     try:
-        # === MUDANÇA AQUI ===
-        # Filtra apenas as doações que NÃO estão arquivadas
         doacoes = Doacao.query.filter_by(is_archived=False).all()
         lista_de_doacoes = [d.to_dict() for d in doacoes]
         return jsonify(lista_de_doacoes), 200
@@ -171,11 +162,10 @@ def get_doacoes():
         print(f"Erro em get_doacoes: {e}")
         return jsonify({"erro": str(e)}), 500
 
-# === ROTA NOVA ===
 @app.route('/api/doacoes/minhas', methods=['GET'])
 @login_required
 def get_minhas_doacoes():
-    """API que lista TODAS as doações (ativas e arquivadas) do usuário logado"""
+    # (código sem alteração)
     try:
         doacoes = Doacao.query.filter_by(author=current_user).order_by(Doacao.is_archived, Doacao.id.desc()).all()
         lista_de_doacoes = [d.to_dict() for d in doacoes]
@@ -184,12 +174,14 @@ def get_minhas_doacoes():
         print(f"Erro em get_minhas_doacoes: {e}")
         return jsonify({"erro": str(e)}), 500
 
+# === FUNÇÃO CORRIGIDA ===
 @app.route('/api/doacao', methods=['POST'])
 @login_required 
 def create_doacao():
-    # (Função create_doacao)
+    """API que cria uma nova doação"""
     try:
         dados = request.get_json() 
+        
         nova_doacao = Doacao(
             nome_local=dados['nome_local'],
             itens=dados['itens'],
@@ -201,8 +193,10 @@ def create_doacao():
             numero=dados.get('numero'),
             bairro=dados.get('bairro'),
             cidade=dados.get('cidade'),
-            author=current_user 
+            author=current_user,
+            is_archived=False # <-- LINHA ADICIONADA
         )
+        
         db.session.add(nova_doacao)
         db.session.commit()
         return jsonify(nova_doacao.to_dict()), 201
@@ -211,45 +205,38 @@ def create_doacao():
         print(f"Erro ao criar doação: {e}") 
         return jsonify({"erro": str(e)}), 400
 
-# === ROTA DE EXCLUSÃO (LÓGICA ATUALIZADA) ===
+# --- Rotas de Gerenciamento (Arquivar, Restaurar, Excluir - sem alteração) ---
+
 @app.route('/api/doacao/<int:doacao_id>', methods=['DELETE'])
 @login_required
 def delete_doacao(doacao_id):
-    """API que exclui uma doação (PERMANENTEMENTE)"""
+    # (código sem alteração)
     try:
         doacao = Doacao.query.get(doacao_id)
         if not doacao:
             return jsonify({"erro": "Doação não encontrada"}), 404
-            
         if doacao.author.id != current_user.id:
             return jsonify({"erro": "Você não tem permissão para excluir esta doação"}), 403
-            
-        # === MUDANÇA: SÓ PODE EXCLUIR SE ESTIVER ARQUIVADO ===
         if not doacao.is_archived:
             return jsonify({"erro": "Você só pode excluir doações que já estão arquivadas."}), 400
-            
         db.session.delete(doacao)
         db.session.commit()
-        
         return jsonify({"message": "Doação excluída permanentemente"}), 200
-        
     except Exception as e:
         db.session.rollback()
         print(f"Erro ao excluir doação: {e}")
         return jsonify({"erro": str(e)}), 500
 
-# === ROTA NOVA (ARQUIVAR) ===
 @app.route('/api/doacao/archive/<int:doacao_id>', methods=['PATCH'])
 @login_required
 def archive_doacao(doacao_id):
-    """API que ARQUIVA uma doação (muda is_archived para True)"""
+    # (código sem alteração)
     try:
         doacao = Doacao.query.get(doacao_id)
         if not doacao:
             return jsonify({"erro": "Doação não encontrada"}), 404
         if doacao.author.id != current_user.id:
             return jsonify({"erro": "Não autorizado"}), 403
-            
         doacao.is_archived = True
         db.session.commit()
         return jsonify({"message": "Doação arquivada com sucesso"}), 200
@@ -257,18 +244,16 @@ def archive_doacao(doacao_id):
         db.session.rollback()
         return jsonify({"erro": str(e)}), 500
 
-# === ROTA NOVA (RESTAURAR) ===
 @app.route('/api/doacao/restore/<int:doacao_id>', methods=['PATCH'])
 @login_required
 def restore_doacao(doacao_id):
-    """API que RESTAURA uma doação (muda is_archived para False)"""
+    # (código sem alteração)
     try:
         doacao = Doacao.query.get(doacao_id)
         if not doacao:
             return jsonify({"erro": "Doação não encontrada"}), 404
         if doacao.author.id != current_user.id:
             return jsonify({"erro": "Não autorizado"}), 403
-            
         doacao.is_archived = False
         db.session.commit()
         return jsonify({"message": "Doação restaurada com sucesso"}), 200
@@ -276,7 +261,7 @@ def restore_doacao(doacao_id):
         db.session.rollback()
         return jsonify({"erro": str(e)}), 500
 
-# --- Execução ---
+# --- Execução (sem alteração) ---
 if __name__ == '__main__':
     with app.app_context():
         db.create_all() 
