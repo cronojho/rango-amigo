@@ -24,14 +24,8 @@
 
     <div class="container mt-4">
         <h2 class="mb-4">Gerenciar Minhas Doações</h2>
-        
         <div id="lista-minhas-doacoes" class="row">
-            <div class="d-flex justify-content-center mt-5">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Carregando...</span>
-                </div>
             </div>
-        </div>
     </div>
     
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
@@ -47,7 +41,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // --- Função de Toast (igual às outras páginas) ---
+        // --- (Função Toast - sem alteração) ---
         const toastEl = document.getElementById('liveToast');
         const toast = new bootstrap.Toast(toastEl);
         function showToast(message, title = 'Rango Amigo', type = 'info') {
@@ -60,11 +54,12 @@
             toast.show();
         }
 
-        // --- Carregar as doações do usuário ---
+        // --- (Função carregarMinhasDoacoes - sem alteração) ---
         async function carregarMinhasDoacoes() {
             const container = document.getElementById('lista-minhas-doacoes');
+            // Adiciona spinner
+            container.innerHTML = `<div class="d-flex justify-content-center mt-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div></div>`;
             try {
-                // 1. Chama a API '/api/doacoes/minhas'
                 const response = await fetch('/api/doacoes/minhas');
                 if (response.status === 401) { 
                     showToast("Sessão expirada. Faça login.", "Erro", "danger");
@@ -81,15 +76,11 @@
                     return;
                 }
 
-                // 2. Cria os cards
                 doacoes.forEach(doacao => {
                     const card = document.createElement('div');
                     card.className = 'col-md-6 mb-3';
-                    
                     let statusBadge;
                     let actionButtons;
-
-                    // 3. Define os botões baseado no status
                     if (doacao.is_archived) {
                         statusBadge = `<span class="badge bg-secondary">Arquivada</span>`;
                         actionButtons = `
@@ -102,7 +93,6 @@
                             <button class="btn btn-warning btn-sm" onclick="handleArquivar(${doacao.id})">Arquivar</button>
                         `;
                     }
-
                     card.innerHTML = `
                         <div class="card">
                             <div class="card-body">
@@ -112,7 +102,7 @@
                                     <strong>Itens:</strong> ${doacao.itens} <br>
                                     <strong>Retirada:</strong> ${doacao.horario_retirada}
                                 </p>
-                                <div class_="mt-2">
+                                <div class="mt-2">
                                     ${actionButtons}
                                 </div>
                             </div>
@@ -125,7 +115,7 @@
             }
         }
 
-        // --- Funções de Ação ---
+        // --- FUNÇÕES DE AÇÃO (ATUALIZADAS) ---
         
         async function handleArquivar(id) {
             if (!confirm('Tem certeza que deseja ARQUIVAR esta doação? Ela sairá do mapa principal.')) return;
@@ -133,7 +123,7 @@
                 const response = await fetch(`/api/doacao/archive/${id}`, { method: 'PATCH' });
                 if (!response.ok) throw new Error('Falha ao arquivar.');
                 showToast('Doação arquivada!', 'Sucesso', 'success');
-                carregarMinhasDoacoes(); // Recarrega a lista
+                carregarMinhasDoacoes(); // <-- MUDANÇA AQUI
             } catch (error) {
                 showToast(error.message, 'Erro', 'danger');
             }
@@ -145,7 +135,7 @@
                 const response = await fetch(`/api/doacao/restore/${id}`, { method: 'PATCH' });
                 if (!response.ok) throw new Error('Falha ao restaurar.');
                 showToast('Doação restaurada!', 'Sucesso', 'success');
-                carregarMinhasDoacoes(); // Recarrega a lista
+                carregarMinhasDoacoes(); // <-- MUDANÇA AQUI
             } catch (error) {
                 showToast(error.message, 'Erro', 'danger');
             }
@@ -160,7 +150,7 @@
                     throw new Error(err.erro || 'Falha ao excluir.');
                 }
                 showToast('Doação excluída permanentemente!', 'Sucesso', 'success');
-                carregarMinhasDoacoes(); // Recarrega a lista
+                carregarMinhasDoacoes(); // <-- MUDANÇA AQUI
             } catch (error) {
                 showToast(error.message, 'Erro', 'danger');
             }
