@@ -4,29 +4,23 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 
 # --- Configuração ---
-basedir = os.path.abspath(os.path.dirname(__file__))
 app = Flask(__name__)
 CORS(app) 
 
-# --- CONFIGURAÇÃO DO BANCO DE DADOS (A MUDANÇA IMPORTANTE) ---
-# O Render nos dá um disco persistente em '/var/data'
-# Vamos dizer ao app para salvar o BD lá.
-db_dir = '/var/data'
-db_path = os.path.join(db_dir, 'rango.db')
+# --- CONFIGURAÇÃO DO BANCO DE DADOS (A MUDANÇA PRINCIPAL) ---
 
-# Se o diretório '/var/data' não existir (ex: rodando no seu PC),
-# salve o BD na pasta local, como antes.
-if not os.path.exists(db_dir):
-    db_path = os.path.join(basedir, 'rango.db')
+# COLE A SUA "EXTERNAL CONNECTION URL" DO RENDER AQUI
+# IMPORTANTE: Se a sua URL começar com "postgres://", 
+# mude para "postgresql://" (o SQLAlchemy exige isso).
+DATABASE_URL = "postgresql://rango_amigo_db_user:Fyrzpverx24tmioZRgHKOX8NDwBBEIG4@dpg-d47m05umcj7s73dfsde0-a.oregon-postgres.render.com/rango_amigo_db" 
 
-print(f"Salvando banco de dados em: {db_path}") # Bom para debug
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # --- FIM DA MUDANÇA ---
 
 db = SQLAlchemy(app)
 
-# --- Modelo do Banco de Dados ---
+# --- Modelo do Banco de Dados (Não muda nada) ---
 class Doacao(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome_local = db.Column(db.String(100), nullable=False)
@@ -45,11 +39,14 @@ class Doacao(db.Model):
             "longitude": self.longitude
         }
 
-# --- ROTAS DAS PÁGINAS HTML ---
+# --- ROTAS DAS PÁGINAS HTML (Não mudam nada) ---
 
 @app.route('/')
 def home():
     """Esta rota agora serve a sua página principal (o mapa)"""
+    # A primeira vez que rodar no Render, ele cria as tabelas
+    with app.app_context():
+        db.create_all()
     return render_template('index.html')
 
 @app.route('/postar')
@@ -57,7 +54,7 @@ def postar_page():
     """Esta rota serve a sua página de cadastro de doação"""
     return render_template('postar.html')
 
-# --- ROTAS DA API (NÃO MUDAM) ---
+# --- ROTAS DA API (Não mudam nada) ---
 
 @app.route('/api/doacoes', methods=['GET'])
 def get_doacoes():
@@ -86,9 +83,8 @@ def create_doacao():
         db.session.rollback()
         return jsonify({"erro": str(e)}), 400
 
-# --- Execução ---
+# --- Execução (Não muda nada) ---
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    # O Gunicorn vai rodar o app, esta linha é só para testes locais
     app.run(debug=True)
