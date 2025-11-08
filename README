@@ -1,0 +1,24 @@
+•	Framework Web: Flask (com gunicorn).
+•	Banco de Dados: PostgreSQL (na nuvem).
+•	Controle de Versão: Git / GitHub (com deploy contínuo).
+•	Nuvem: Render (com a arquitetura correta de Web Service + Banco).
+•	Segurança: Sistema completo de Login, Registro e senhas criptografadas (Flask-Login, Bcrypt).
+•	API (Back-end): Uma API RESTful segura que só permite ações (criar, arquivar) dos donos dos dados.
+•	API (Front-end):
+o	BrasilAPI (para buscar CEPs).
+o	Nominatim/OpenStreetMap (como fallback para geocodificação).
+o	Geolocalização do Navegador (para o botão "Usar minha localização").
+
+•	Interface (UI):
+o	Design responsivo (PC e Celular).
+o	Interface interativa (lista conectada ao mapa).
+o	Feedback visual (Spinners e Toasts, sem alert()).
+
+•	Lógica de Negócio (CRUD Completo):
+o	Create (Criar doação).
+o	Read (Listar no mapa e em "Minhas Doações").
+o	Update (Arquivar/Restaurar)
+o	Delete (Exclusão permanente e segura).
+
+•	Acessibilidade: Cumprimos o requisito com aria-labels, role="status" e navegação por teclado.
+
