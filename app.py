@@ -138,13 +138,39 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # Aqui vamos colocar a lógica de login
-    # (próximo passo)
-    return "Página de Login (em construção)"
+    # Se o usuário já estiver logado, manda para a home
+    if current_user.is_authenticated:
+        return redirect(url_for('home'))
+
+    # Se o formulário for enviado (POST)
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        # 1. Encontra o usuário no banco
+        user = User.query.filter_by(email=email).first()
+
+        # 2. Verifica se o usuário existe E se a senha está correta
+        if user and bcrypt.check_password_hash(user.password_hash, password):
+            # 3. Se sim, loga o usuário
+            login_user(user)
+            
+            # (Opcional) Redireciona para a página que ele tentou acessar
+            next_page = request.args.get('next')
+            flash('Login efetuado com sucesso!', 'success')
+            return redirect(next_page or url_for('home'))
+        else:
+            # 4. Se não, avisa o erro
+            flash('E-mail ou senha incorretos. Tente novamente.', 'danger')
+            return redirect(url_for('login'))
+
+    # Se for GET, apenas mostra a página de login
+    return render_template('login.html')
 
 @app.route('/logout')
 def logout():
     logout_user()
+    flash('Você saiu da sua conta.', 'info')
     return redirect(url_for('home'))
 
 # --- ROTAS DA API ---
