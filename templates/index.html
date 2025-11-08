@@ -40,7 +40,7 @@
     <nav class="navbar bg-white shadow-sm fixed-top">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">Rango Amigo</span>
-            <a href="postar.html" class="btn btn-success">Cadastrar Nova Doação</a>
+            <a href="/postar" class="btn btn-success">Cadastrar Nova Doação</a>
         </div>
     </nav>
 
@@ -86,15 +86,15 @@
         );
 
         
-        // --- 3. CARREGAMENTO DAS DOAÇÕES (A GRANDE MUDANÇA) ---
+        // --- 3. CARREGAMENTO DAS DOAÇÕES ---
         async function carregarDoacoes() {
-            // Pega o container da lista de cards
             const feed = document.getElementById('lista-doacoes');
             feed.innerHTML = '<p>Carregando...</p>';
 
             try {
-                // 1. Chamar sua API Flask (igual antes)
-                const response = await fetch('http://127.0.0.1:5000/api/doacoes');
+                // --- URL DO FETCH CORRIGIDA ---
+                // Agora é um link relativo, funciona local e no Render
+                const response = await fetch('/api/doacoes');
                 if (!response.ok) throw new Error('Falha ao carregar dados da API');
                 
                 const doacoes = await response.json();
@@ -105,22 +105,21 @@
                     return;
                 }
 
-                // 2. Loop para criar OS DOIS ao mesmo tempo: Pins e Cards
+                // Loop para criar Pins e Cards
                 doacoes.forEach(doacao => {
                     
-                    // --- A. Cria o conteúdo do Popup (para o pin) ---
                     const popupContent = `
                         <b>${doacao.nome_local}</b><br>
                         <strong>Itens:</strong> ${doacao.itens}<br>
                         <strong>Retirada:</strong> ${doacao.horario_retirada}
                     `;
                     
-                    // --- B. Adiciona o Pin no Mapa ---
+                    // Adiciona o Pin no Mapa
                     L.marker([doacao.latitude, doacao.longitude])
                         .addTo(map)
                         .bindPopup(popupContent);
                     
-                    // --- C. Cria o Card na Lista ---
+                    // Cria o Card na Lista
                     const card = document.createElement('div');
                     card.className = 'card mb-3';
                     card.innerHTML = `
@@ -135,7 +134,6 @@
                             </small>
                         </div>
                     `;
-                    // Adiciona o card criado à lista na tela
                     feed.appendChild(card);
                 });
 

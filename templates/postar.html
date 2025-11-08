@@ -11,7 +11,7 @@
     <nav class="navbar bg-white shadow-sm">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">Rango Amigo</span>
-            <a href="index.html" class="btn btn-outline-secondary">Voltar ao Feed</a>
+            <a href="/" class="btn btn-outline-secondary">Voltar ao Feed</a>
         </div>
     </nav>
 
@@ -47,16 +47,15 @@
     </div>
 
     <script>
-        // --- SCRIPT NOVO PARA GEOLOCALIZAÇÃO ---
+        // --- SCRIPT PARA GEOLOCALIZAÇÃO ---
         document.getElementById('btn-local').addEventListener('click', () => {
             if ("geolocation" in navigator) {
                 const status = document.getElementById('local-status');
                 status.innerText = "Obtendo localização...";
-                status.className = "text-info"; // Muda a cor para azul
+                status.className = "text-info";
 
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        // Sucesso!
                         const lat = position.coords.latitude;
                         const long = position.coords.longitude;
                         
@@ -64,12 +63,11 @@
                         document.getElementById('longitude').value = long;
                         
                         status.innerText = `Localização obtida com sucesso!`;
-                        status.className = "text-success"; // Muda a cor para verde
+                        status.className = "text-success";
                     },
                     (error) => {
-                        // Erro!
                         status.innerText = "Erro ao obter localização. Por favor, libere a permissão no seu navegador e tente novamente.";
-                        status.className = "text-danger"; // Muda a cor para vermelho
+                        status.className = "text-danger";
                     }
                 );
             } else {
@@ -78,9 +76,9 @@
         });
 
 
-        // --- SCRIPT ATUALIZADO PARA ENVIAR O FORMULÁRIO ---
+        // --- SCRIPT PARA ENVIAR O FORMULÁRIO ---
         document.getElementById('form-doacao').addEventListener('submit', async function(event) {
-            event.preventDefault(); // Impede o envio padrão
+            event.preventDefault(); 
 
             const btn = document.getElementById('btn-salvar');
             btn.disabled = true;
@@ -91,22 +89,21 @@
                 nome_local: document.getElementById('nome_local').value,
                 itens: document.getElementById('itens').value,
                 horario_retirada: document.getElementById('horario_retirada').value,
-                // --- CAMPOS NOVOS ---
                 latitude: parseFloat(document.getElementById('latitude').value),
                 longitude: parseFloat(document.getElementById('longitude').value)
             };
             
-            // Verificação simples se a localização foi obtida
             if (!dados.latitude || !dados.longitude) {
                 alert("Por favor, clique no botão 'Usar Minha Localização Atual' antes de salvar.");
                 btn.disabled = false;
                 btn.innerText = 'Salvar Doação';
-                return; // Para a execução do salvamento
+                return;
             }
 
             try {
-                // 2. Enviar os dados para a API Flask (POST)
-                const response = await fetch('http://127.0.0.1:5000/api/doacao', {
+                // --- URL DO FETCH CORRIGIDA ---
+                // Agora é um link relativo, funciona local e no Render
+                const response = await fetch('/api/doacao', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -119,7 +116,7 @@
                 }
 
                 alert('Doação cadastrada com sucesso!');
-                window.location.href = 'index.html'; // Volta para o feed
+                window.location.href = '/'; // Volta para o feed (rota principal)
 
             } catch (error) {
                 alert(`Erro: ${error.message}`);
