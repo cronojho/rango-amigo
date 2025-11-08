@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Doações - Rango Amigo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <nav class="navbar bg-white shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('map') }}">Rango Amigo</a>
+            <div>
+                <span class="navbar-text me-3">
+                    Olá, {{ current_user.nome_completo.split(' ')[0] }}
+                </span>
+                <a href="{{ url_for('map') }}" class="btn btn-outline-primary">Ver Mapa</a>
+                <a href="{{ url_for('postar_page') }}" class="btn btn-success ms-2">Cadastrar Doação</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger ms-2">Sair</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h2 class="mb-4">Gerenciar Minhas Doações</h2>
+        
+        <div id="lista-minhas-doacoes" class="row">
+            <div class="d-flex justify-content-center mt-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+      <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+          <strong class="me-auto" id="toast-title">Rango Amigo</strong>
+          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body" id="toast-body"></div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // --- Função de Toast (igual às outras páginas) ---
+        const toastEl = document.getElementById('liveToast');
+        const toast = new bootstrap.Toast(toastEl);
+        function showToast(message, title = 'Rango Amigo', type = 'info') {
+            document.getElementById('toast-title').innerText = title;
+            document.getElementById('toast-body').innerText = message;
+            toastEl.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info');
+            if (type === 'success') toastEl.classList.add('text-bg-success');
+            else if (type === 'danger') toastEl.classList.add('text-bg-danger');
+            else toastEl.classList.add('text-bg-info');
+            toast.show();
+        }
+
+        // --- Carregar as doações do usuário ---
+        async function carregarMinhasDoacoes() {
+            const container = document.getElementById('lista-minhas-doacoes');
+            try {
+                // 1. Chama a API '/api/doacoes/minhas'
+                const response = await fetch('/api/doacoes/minhas');
+                if (response.status === 401) { 
+                    showToast("Sessão expirada. Faça login.", "Erro", "danger");
+                    window.location.href = '/';
+                    return;
+                }
+                if (!response.ok) throw new Error('Falha ao carregar suas doações.');
+                
+                const doacoes = await response.json();
+                container.innerHTML = ''; 
+
+                if (doacoes.length === 0) {
+                    container.innerHTML = '<p class="text-muted">Você ainda não cadastrou nenhuma doação.</p>';
+                    return;
+                }
+
+                // 2. Cria os cards
+                doacoes.forEach(doacao => {
+                    const card = document.createElement('div');
+                    card.className = 'col-md-6 mb-3';
+                    
+                    let statusBadge;
+                    let actionButtons;
+
+                    // 3. Define os botões baseado no status
+                    if (doacao.is_archived) {
+                        statusBadge = `<span class="badge bg-secondary">Arquivada</span>`;
+                        actionButtons = `
+                            <button class="btn btn-primary btn-sm" onclick="handleRestaurar(${doacao.id})">Restaurar</button>
+                            <button class="btn btn-danger btn-sm ms-2" onclick="handleExcluir(${doacao.id})">Excluir Permanente</button>
+                        `;
+                    } else {
+                        statusBadge = `<span class="badge bg-success">Ativa</span>`;
+                        actionButtons = `
+                            <button class="btn btn-warning btn-sm" onclick="handleArquivar(${doacao.id})">Arquivar</button>
+                        `;
+                    }
+
+                    card.innerHTML = `
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">${doacao.nome_local} ${statusBadge}</h5>
+                                <h6 class="card-subtitle mb-2 text-muted">${doacao.rua || 'Localização GPS'}, ${doacao.numero || 'S/N'}</h6>
+                                <p class="card-text">
+                                    <strong>Itens:</strong> ${doacao.itens} <br>
+                                    <strong>Retirada:</strong> ${doacao.horario_retirada}
+                                </p>
+                                <div class_="mt-2">
+                                    ${actionButtons}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+            } catch (error) {
+                container.innerHTML = `<p class="text-danger">${error.message}</p>`;
+            }
+        }
+
+        // --- Funções de Ação ---
+        
+        async function handleArquivar(id) {
+            if (!confirm('Tem certeza que deseja ARQUIVAR esta doação? Ela sairá do mapa principal.')) return;
+            try {
+                const response = await fetch(`/api/doacao/archive/${id}`, { method: 'PATCH' });
+                if (!response.ok) throw new Error('Falha ao arquivar.');
+                showToast('Doação arquivada!', 'Sucesso', 'success');
+                carregarMinhasDoacoes(); // Recarrega a lista
+            } catch (error) {
+                showToast(error.message, 'Erro', 'danger');
+            }
+        }
+
+        async function handleRestaurar(id) {
+            if (!confirm('Tem certeza que deseja RESTAURAR esta doação? Ela voltará para o mapa principal.')) return;
+            try {
+                const response = await fetch(`/api/doacao/restore/${id}`, { method: 'PATCH' });
+                if (!response.ok) throw new Error('Falha ao restaurar.');
+                showToast('Doação restaurada!', 'Sucesso', 'success');
+                carregarMinhasDoacoes(); // Recarrega a lista
+            } catch (error) {
+                showToast(error.message, 'Erro', 'danger');
+            }
+        }
+
+        async function handleExcluir(id) {
+            if (!confirm('EXCLUSÃO PERMANENTE. Tem certeza? Esta ação não pode ser desfeita.')) return;
+            try {
+                const response = await fetch(`/api/doacao/${id}`, { method: 'DELETE' });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.erro || 'Falha ao excluir.');
+                }
+                showToast('Doação excluída permanentemente!', 'Sucesso', 'success');
+                carregarMinhasDoacoes(); // Recarrega a lista
+            } catch (error) {
+                showToast(error.message, 'Erro', 'danger');
+            }
+        }
+
+        // --- Execução ---
+        window.addEventListener('load', carregarMinhasDoacoes);
+    </script>
+</body>
+</html>

@@ -15,6 +15,7 @@
                 <span class="navbar-text me-3">
                     Olá, {{ current_user.nome_completo.split(' ')[0] }}
                 </span>
+                <a href="{{ url_for('minhas_doacoes_page') }}" class="btn btn-outline-primary">Minhas Doações</a>
                 <a href="{{ url_for('logout') }}" class="btn btn-outline-danger ms-2">Sair</a>
             </div>
         </div>
@@ -75,50 +76,28 @@
         </form>
     </div>
 
-    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
       <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
-        <div class="toast-header">
-          <strong class="me-auto" id="toast-title">Rango Amigo</strong>
-          <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
-        <div class="toast-body" id="toast-body">
-          </div>
-      </div>
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // --- NOVO: Inicialização e Função do Toast ---
+        // --- (Função Toast - sem alteração) ---
         const toastEl = document.getElementById('liveToast');
         const toast = new bootstrap.Toast(toastEl);
-        
-        /**
-         * Exibe uma notificação (toast)
-         * @param {string} message A mensagem a ser exibida
-         * @param {string} title O título da notificação
-         * @param {string} type 'success', 'danger', ou 'info'
-         */
         function showToast(message, title = 'Rango Amigo', type = 'info') {
             document.getElementById('toast-title').innerText = title;
             document.getElementById('toast-body').innerText = message;
-            
-            // Limpa classes de cor antigas
             toastEl.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info');
-            
-            // Adiciona a nova classe de cor
-            if (type === 'success') {
-                toastEl.classList.add('text-bg-success');
-            } else if (type === 'danger') {
-                toastEl.classList.add('text-bg-danger');
-            } else {
-                toastEl.classList.add('text-bg-info');
-            }
-            
+            if (type === 'success') toastEl.classList.add('text-bg-success');
+            else if (type === 'danger') toastEl.classList.add('text-bg-danger');
+            else toastEl.classList.add('text-bg-info');
             toast.show();
         }
         
-        // --- Lógica do Formulário (referências) ---
+        // --- (Lógica do Formulário, GPS, CEP - sem alteração) ---
         const statusEl = document.getElementById('local-status');
         const latEl = document.getElementById('latitude');
         const lonEl = document.getElementById('longitude');
@@ -127,8 +106,8 @@
         const bairroEl = document.getElementById('bairro');
         const cidadeEl = document.getElementById('cidade');
         
-        // --- Lógica do GPS (sem alteração) ---
         document.getElementById('btn-local').addEventListener('click', () => {
+            // ... (lógica do gps)
             if ("geolocation" in navigator) {
                 statusEl.innerText = "Obtendo localização...";
                 statusEl.className = "text-info mt-3";
@@ -150,8 +129,8 @@
             }
         });
 
-        // --- Lógica do CEP (sem alteração) ---
         document.getElementById('btn-buscar-cep').addEventListener('click', async () => {
+            // ... (lógica do cep)
             const cep = cepEl.value.replace(/\D/g, ''); 
             if (cep.length !== 8) {
                 statusEl.innerText = "CEP inválido. Deve conter 8 números.";
@@ -164,11 +143,9 @@
                 const response = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`);
                 if (!response.ok) throw new Error('CEP não encontrado.');
                 const data = await response.json();
-
                 ruaEl.value = data.street;
                 bairroEl.value = data.neighborhood;
                 cidadeEl.value = data.city;
-                
                 if (data.location && data.location.coordinates) {
                     latEl.value = data.location.coordinates.latitude;
                     lonEl.value = data.location.coordinates.longitude;
@@ -191,18 +168,12 @@
             cidadeEl.value = '';
         }
 
-        // --- LÓGICA DE ENVIO (MUDANÇAS NO FEEDBACK) ---
         document.getElementById('form-doacao').addEventListener('submit', async function(event) {
+            // ... (lógica de envio do form, spinners, etc - sem alteração)
             event.preventDefault(); 
             const btn = document.getElementById('btn-salvar');
-            
-            // NOVO: Feedback do botão com spinner
             btn.disabled = true;
-            btn.innerHTML = `
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                Salvando...
-            `;
-
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Salvando...`;
             const dados = {
                 nome_local: document.getElementById('nome_local').value,
                 itens: document.getElementById('itens').value,
@@ -215,41 +186,31 @@
                 bairro: bairroEl.value,
                 cidade: cidadeEl.value
             };
-            
             if (!dados.latitude || !dados.longitude) {
-                // NOVO: Feedback com Toast
                 showToast("Por favor, use o botão 'Usar Minha Localização Atual' ou 'Buscar CEP' antes de salvar.", "Atenção", "info");
                 btn.disabled = false;
-                btn.innerText = 'Salvar Doação'; // Restaura o botão
+                btn.innerText = 'Salvar Doação';
                 return;
             }
-
             try {
                 const response = await fetch('/api/doacao', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dados)
                 });
-                
                 if (response.status === 401) {
-                    // NOVO: Feedback com Toast
                     showToast("Sua sessão expirou. Você será redirecionado para o login.", "Sessão Expirada", "danger");
-                    setTimeout(() => { window.location.href = '/'; }, 3000); // Espera 3s para o usuário ler
+                    setTimeout(() => { window.location.href = '/'; }, 3000); 
                     return;
                 }
-                if (!response.ok) {
-                    throw new Error('Falha ao salvar. Verifique os dados.');
-                }
+                if (!response.ok) throw new Error('Falha ao salvar. Verifique os dados.');
                 
-                // NOVO: Feedback com Toast (e redirecionamento)
                 showToast('Doação cadastrada com sucesso! Redirecionando...', 'Sucesso!', 'success');
-                setTimeout(() => { window.location.href = '/map'; }, 2000); // Espera 2s para o usuário ler
-
+                setTimeout(() => { window.location.href = '/map'; }, 2000); 
             } catch (error) {
-                // NOVO: Feedback com Toast
                 showToast(`Erro: ${error.message}`, "Erro ao Salvar", "danger");
                 btn.disabled = false;
-                btn.innerText = 'Salvar Doação'; // Restaura o botão
+                btn.innerText = 'Salvar Doação';
             }
         });
     </script>

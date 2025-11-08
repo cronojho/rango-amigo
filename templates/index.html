@@ -28,7 +28,7 @@
         }
     </style>
 </head>
-<body>
+<body data-user-id="{{ current_user.id }}">
 
     <nav class="navbar bg-white shadow-sm fixed-top">
         <div class="container-fluid">
@@ -37,7 +37,8 @@
                 <span class="navbar-text me-3">
                     Olá, {{ current_user.nome_completo.split(' ')[0] }}
                 </span>
-                <a href="{{ url_for('postar_page') }}" class="btn btn-success">Cadastrar Doação</a>
+                <a href="{{ url_for('minhas_doacoes_page') }}" class="btn btn-outline-primary">Minhas Doações</a>
+                <a href="{{ url_for('postar_page') }}" class="btn btn-success ms-2">Cadastrar Doação</a>
                 <a href="{{ url_for('logout') }}" class="btn btn-outline-danger ms-2">Sair</a>
             </div>
         </div>
@@ -45,14 +46,11 @@
 
     <div class="container-fluid">
         <div class="row">
-            
             <div class="col-md-7 p-0 coluna-conteudo">
                 <div id="map"></div>
             </div>
-            
             <div class="col-md-5 coluna-conteudo">
                 <div id="lista-doacoes-wrapper" class="p-3">
-                    
                     <div id="flash-container">
                         {% with messages = get_flashed_messages(with_categories=true) %}
                             {% if messages %}
@@ -65,20 +63,23 @@
                             {% endif %}
                         {% endwith %}
                     </div>
-                    
                     <h2 class="h4 mb-3" aria-label="Lista de Doações Disponíveis">Doações Disponíveis</h2>
                     <div id="lista-doacoes">
                         </div>
                 </div>
             </div>
-            
+        </div>
+    </div>
+    
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+      <div id="liveToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // --- (Inicialização do Mapa e Localização do Usuário - sem alteração) ---
+        // --- (Inicialização do Mapa, Localização, UserID - sem alteração) ---
         const coordenadasPederneiras = [-22.35, -48.77]; 
         const map = L.map('map').setView(coordenadasPederneiras, 14);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -87,31 +88,36 @@
 
         navigator.geolocation.getCurrentPosition(
             (pos) => {
-                const lat = pos.coords.latitude;
-                const long = pos.coords.longitude;
-                L.marker([lat, long]).addTo(map).bindPopup('<b>Você está aqui!</b>').openPopup();
+                L.marker([pos.coords.latitude, pos.coords.longitude]).addTo(map).bindPopup('<b>Você está aqui!</b>').openPopup();
             }, 
             () => { console.log("Não foi possível pegar a localização do usuário."); }
         );
 
-        
+        const currentUserId = document.body.dataset.userId;
         const marcadores = {};
+
+        // --- (Função Toast - sem alteração) ---
+        const toastEl = document.getElementById('liveToast');
+        const toast = new bootstrap.Toast(toastEl);
+        function showToast(message, title = 'Rango Amigo', type = 'info') {
+            document.getElementById('toast-title').innerText = title;
+            document.getElementById('toast-body').innerText = message;
+            toastEl.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info');
+            if (type === 'success') toastEl.classList.add('text-bg-success');
+            else if (type === 'danger') toastEl.classList.add('text-bg-danger');
+            else toastEl.classList.add('text-bg-info');
+            toast.show();
+        }
         
         async function carregarDoacoes() {
+            // (Função de carregamento e spinner - sem alteração)
             const feed = document.getElementById('lista-doacoes');
-            // NOVO: Spinner de Carregamento
-            feed.innerHTML = `
-                <div class="d-flex justify-content-center mt-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Carregando...</span>
-                    </div>
-                </div>
-            `;
+            feed.innerHTML = `<div class="d-flex justify-content-center mt-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Carregando...</span></div></div>`;
             
             try {
                 const response = await fetch('/api/doacoes'); 
                 if (response.status === 401) { 
-                    alert("Sua sessão expirou. Por favor, faça o login novamente.");
+                    showToast("Sessão expirada. Faça login.", "Erro", "danger");
                     window.location.href = '/';
                     return;
                 }
@@ -119,37 +125,44 @@
                 
                 const doacoes = await response.json();
                 feed.innerHTML = ''; 
-
                 if (doacoes.length === 0) {
                     feed.innerHTML = '<p class="text-muted">Nenhuma doação cadastrada no momento.</p>';
                     return;
                 }
                 
-                // O resto da função (loop 'forEach' para criar cards e pins)
-                // continua exatamente igual.
+                Object.values(marcadores).forEach(m => m.remove());
+
                 doacoes.forEach(doacao => {
-                    let endereco = '';
-                    if (doacao.rua) {
-                        endereco += `${doacao.rua}, ${doacao.numero || 'S/N'}<br>${doacao.bairro}, ${doacao.cidade}`;
-                    } else {
-                        endereco = `Coordenadas: ${doacao.latitude.toFixed(4)}, ${doacao.longitude.toFixed(4)}`;
+                    let endereco = doacao.rua ? `${doacao.rua}, ${doacao.numero || 'S/N'}<br>${doacao.bairro}, ${doacao.cidade}` : `Coordenadas: ${doacao.latitude.toFixed(4)}, ${doacao.longitude.toFixed(4)}`;
+
+                    // --- MUDANÇA: Botão de Arquivar ---
+                    let actionButtonHtml = '';
+                    if (doacao.user_id == currentUserId) {
+                        // O botão agora é 'Arquivar', amarelo, e chama 'handleArquivar'
+                        actionButtonHtml = `
+                            <button class="btn btn-warning btn-sm mt-2" onclick="handleArquivar(${doacao.id})">
+                                Arquivar
+                            </button>
+                        `;
                     }
+                    
                     const popupContent = `
                         <b>${doacao.nome_local}</b><br>
                         <small>${endereco}</small><br><br>
                         <strong>Doador:</strong> ${doacao.author_nome}<br>
                         <strong>Itens:</strong> ${doacao.itens}<br>
-                        <strong>Retirada:</strong> ${doacao.horario_retirada}
-                    `;
-                    const marcador = L.marker([doacao.latitude, doacao.longitude])
-                        .addTo(map)
-                        .bindPopup(popupContent);
+                        <strong>Retirada:</strong> ${doacao.horario_retirada}<br>
+                        ${actionButtonHtml} `;
+                    
+                    const marcador = L.marker([doacao.latitude, doacao.longitude]).addTo(map).bindPopup(popupContent);
                     marcadores[doacao.id] = marcador;
+                    
                     const card = document.createElement('div');
                     card.className = 'card mb-3 doacao-card';
                     card.dataset.doacaoId = doacao.id; 
                     card.setAttribute('role', 'button');
                     card.setAttribute('tabindex', '0');  
+                    
                     card.innerHTML = `
                         <div class="card-body">
                             <h5 class="card-title">${doacao.nome_local}</h5>
@@ -159,7 +172,7 @@
                                 <strong>Retirada:</strong> ${doacao.horario_retirada}
                             </p>
                             <small class="text-muted">Por: ${doacao.author_nome}</small>
-                        </div>
+                            ${actionButtonHtml} </div>
                     `;
                     feed.appendChild(card);
                 });
@@ -168,10 +181,36 @@
             }
         }
         
-        // Listeners de Clique e Teclado (sem alteração)
+        // --- FUNÇÃO DE EXCLUIR RENOMEADA PARA ARQUIVAR ---
+        async function handleArquivar(id) {
+            if (!confirm('Tem certeza que deseja ARQUIVAR esta doação? Ela sairá do mapa principal.')) {
+                return;
+            }
+            try {
+                // Chama a nova rota de API (PATCH)
+                const response = await fetch(`/api/doacao/archive/${id}`, {
+                    method: 'PATCH',
+                });
+
+                if (response.status === 403) throw new Error('Você não tem permissão para arquivar esta doação.');
+                if (!response.ok) throw new Error('Falha ao arquivar a doação.');
+                
+                showToast('Doação arquivada com sucesso!', 'Sucesso', 'success');
+                carregarDoacoes(); // Recarrega o mapa (o item vai sumir)
+            } catch (error) {
+                showToast(error.message, 'Erro', 'danger');
+            }
+        }
+        
+        // --- (Listener de Clique - ATUALIZADO) ---
         document.getElementById('lista-doacoes').addEventListener('click', (e) => {
+            // Ignora cliques no botão de arquivar
+            if (e.target.classList.contains('btn-warning')) {
+                return; 
+            }
             const card = e.target.closest('.doacao-card');
             if (card) {
+                // (lógica de mover o mapa - sem alteração)
                 const id = card.dataset.doacaoId;
                 const marcador = marcadores[id];
                 if (marcador) {
@@ -180,8 +219,14 @@
                 }
             }
         });
+
+        // --- (Listener de Teclado - ATUALIZADO) ---
         document.getElementById('lista-doacoes').addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') { 
+                // Ignora cliques no botão de arquivar
+                if (e.target.classList.contains('btn-warning')) {
+                    return;
+                }
                 const card = e.target.closest('.doacao-card');
                 if (card) {
                     e.preventDefault(); 
