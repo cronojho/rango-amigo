@@ -187,7 +187,7 @@ def get_minhas_doacoes():
 @app.route('/api/doacao', methods=['POST'])
 @login_required 
 def create_doacao():
-    # (Função create_doacao sem alteração)
+    # (Função create_doacao)
     try:
         dados = request.get_json() 
         nova_doacao = Doacao(
@@ -276,7 +276,7 @@ def restore_doacao(doacao_id):
         db.session.rollback()
         return jsonify({"erro": str(e)}), 500
 
-# --- Execução (sem alteração) ---
+# --- Execução ---
 if __name__ == '__main__':
     with app.app_context():
         db.create_all() 
